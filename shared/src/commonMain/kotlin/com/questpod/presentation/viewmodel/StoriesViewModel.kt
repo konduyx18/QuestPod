@@ -10,20 +10,28 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
+ * Sealed class representing UI state for stories screen.
+ */
+sealed class StoriesUiState {
+    /** Loading state when data is being fetched */
+    object Loading : StoriesUiState()
+    
+    /** Success state with loaded stories */
+    data class Success(val stories: List<Story>) : StoriesUiState()
+    
+    /** Error state with error message */
+    data class Error(val message: String) : StoriesUiState()
+}
+
+/**
  * ViewModel for managing stories in the UI.
  */
 class StoriesViewModel(
     private val getPublicStoriesUseCase: GetPublicStoriesUseCase,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main)
 ) {
-    private val _stories = MutableStateFlow<List<Story>>(emptyList())
-    val stories: StateFlow<List<Story>> = _stories.asStateFlow()
-    
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-    
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
+    private val _uiState = MutableStateFlow<StoriesUiState>(StoriesUiState.Loading)
+    val uiState: StateFlow<StoriesUiState> = _uiState.asStateFlow()
     
     /**
      * Load public stories.
@@ -31,16 +39,13 @@ class StoriesViewModel(
     fun loadPublicStories() {
         coroutineScope.launch {
             try {
-                _isLoading.value = true
-                _error.value = null
+                _uiState.value = StoriesUiState.Loading
                 
                 getPublicStoriesUseCase().collect { storyList ->
-                    _stories.value = storyList
+                    _uiState.value = StoriesUiState.Success(storyList)
                 }
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to load stories"
-            } finally {
-                _isLoading.value = false
+                _uiState.value = StoriesUiState.Error(e.message ?: "Failed to load stories")
             }
         }
     }
